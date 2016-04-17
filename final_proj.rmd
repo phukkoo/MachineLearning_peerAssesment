@@ -1,0 +1,40 @@
+---
+title: "Machine Learning Final Project "
+author: "Priti Hukkoo"
+date: "April 17, 2016"
+output: html_document
+---
+
+# Project Introduction
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement undertaken by enthusiasts who take measurements about themselves regularly to improve their health and find patterns in their behavior or just for tech curiosity
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+In this project will be use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants who were asked to perform barbell lifts correctly in 1 way and incorrectly in 4 different ways. The readings for these 5 different types are given label "classe" which has the following vales,  A(Correct way), B,C, D, E ( Incorrect).
+More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (http://groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset).
+Our goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and try to build a statistical mdoel that can accurately predict the "classe" label for the collected data, using the other data columns as predictors for the "classes" column.
+And will also use our most accurate prediction model to predict 20 different test cases.
+
+# Data Processing
+
+## Getting and Loading Data
+
+We first load the R packages needed for analysis and then download the training and testing data sets from the given URLs.
+
+```{r, echo=FALSE}
+# load the required packages
+#TBD are all these libraries reqd
+library(caret); library(rattle); 
+library(rpart); library(rpart.plot);
+library(randomForest); 
+```
+```{r, echo=FALSE}
+# import the data from the URLs
+dataUrl = 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv';
+testUrl = 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv';
+training = read.csv(dataUrl, na.strings=c("NA",""));
+testing = read.csv(testUrl,na.strings=c("NA",""));
+dim(training)
+dim(testing)
+```
