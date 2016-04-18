@@ -22,19 +22,163 @@ And will also use our most accurate prediction model to predict 20 different tes
 
 We first load the R packages needed for analysis and then download the training and testing data sets from the given URLs.
 
-```{r, echo=FALSE}
+```{r}
 # load the required packages
-#TBD are all these libraries reqd
-library(caret); library(rattle); 
-library(rpart); library(rpart.plot);
+library(caret); 
+library(survival)
+library(gbm)
+library(rpart); 
+library(rpart.plot);
+library(rattle);
 library(randomForest); 
 ```
-```{r, echo=FALSE}
+```{r}
 # import the data from the URLs
 dataUrl = 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv';
 testUrl = 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv';
 training = read.csv(dataUrl, na.strings=c("NA",""));
 testing = read.csv(testUrl,na.strings=c("NA",""));
+## resulting dimensions of the training and testing dataframes
 dim(training)
 dim(testing)
 ```
+
+## Data Cleaning
+We now delete columns (predictors) of the training set that contain any missing values.
+
+```{r}
+training <- training[, colSums(is.na(training)) == 0]
+testing <- testing[, colSums(is.na(testing)) == 0]
+```
+We also remove the first seven predictors since these variables seem to be more time series realted with little to no affect on the outcome "classe" variable.
+
+```{r}
+trainData <- training[, -c(1:7)]
+testData <- testing[, -c(1:7)]
+```
+
+Also check for covariates that have virtually no variablility.
+```{r}
+nsv <- nearZeroVar(trainData, saveMetrics=TRUE)
+nsv
+```
+Given that all of the near zero variance variables (nsv) are FALSE, there's no need to eliminate any covariates due to lack of variablility.
+
+The final list of columns that we will use for the model creation are 
+```{r}
+# Show remaining columns.
+colnames(trainData)
+```
+
+The cleaned data sets trainData and testData both have 53 columns with the same first 52 predictor variables and the last variable classe and problem_id individually. trainData has 19622 rows while testData has 20 rows.
+
+## Data spliting
+In order to preventoverfitting and out-of-sample errors, we split the cleaned training set trainData into a training set (train, 70%) for prediction and a validation set (valid 30%) to compute the out-of-sample errors.
+
+```{r}
+set.seed(7826) 
+inTrain <- createDataPartition(trainData$classe, p = 0.7, list = FALSE)
+train <- trainData[inTrain, ]
+valid <- trainData[-inTrain, ]
+```
+
+
+# Model building
+In terms of model selection for this multiclass classification problem, there are several choices. I will be using GBM(Generalized Boosting Regression Model),  (RPart) classification trees and (RF) random forests to train data and predict the outcome. 
+
+Here we will use a 5-fold cross validation (default setting in trainControl function is 10) when implementing the algorithm to save a little computing time. Since data transformations may be less important in non-linear models like classification trees, we do not transform any variables.
+
+
+```{r}
+fitControl <- trainControl(method = "cv", number = 5)
+preProcess=c("center", "scale")
+```
+
+## Model using Classification trees
+```{r}
+rpart_fit <- train(classe ~ ., data = train, method = "rpart", preProcess=c("center", "scale"), trControl = fitControl)
+print(rpart_fit, digits = 4)
+# fancy tree respresentation of classification tree
+fancyRpartPlot(rpart_fit$finalModel)
+```
+
+### Predicting  using Classification Tree Model
+```{r}
+# predict outcomes using validation set
+rpart_predict <- predict(rpart_fit, valid)
+# Confusion matrix for Classification tree model
+(rpart_conf <- confusionMatrix(valid$classe, rpart_predict))
+```
+
+### Accuracy for Classification tree model
+```{r}
+(rpart_accuracy <- rpart_conf$overall[1])
+# Plot of the accuracy for the various "classe" values
+plot(rpart_conf$table, col = rpart_conf$byClass, main = paste("Classification Tree Confusion Matrix: Accuracy =",
+round(rpart_conf$overall['Accuracy'], 4)))
+
+```
+
+
+##Model using Generalized Boosting Regression
+
+```{r}
+gbm_fit <- train(classe ~ ., data=train,
+                method="gbm",
+                preProcess=c("center", "scale"),
+                trControl=fitControl,
+                verbose=FALSE)
+print(gbm_fit, digits = 4)
+# plot GBM
+plot(gbm_fit)
+```
+
+###Predicting using GBM Model
+```{r}
+# predict outcomes using validation set
+gbm_predict <- predict(gbm_fit, valid)
+# Show prediction result
+(gbm_conf <- confusionMatrix(valid$classe, gbm_predict))
+```
+
+###Accuracy of GBM model
+```{r}
+#GBM accuracy
+(gbm_accuracy <- gbm_conf$overall[1])
+plot(gbm_conf$table, col = gbm_conf$byClass, main = paste("GBM Confusion Matrix: Accuracy =", round(gbm_conf$overall['Accuracy'], 4)))
+```
+
+
+##Model using Random Forest
+```{r}
+# using Random Forest
+
+rf_fit <- train(classe ~ ., data = train, method = "rf", preProcess=c("center", "scale"),
+                trControl = fitControl)
+print(rf_fit, digits = 4)
+#plot Random Forest
+plot(rf_fit)
+```
+
+### Predicting using Random Forest Model
+```{r}
+# predict outcomes using validation set
+rf_predict <- predict(rf_fit, valid)
+# Show prediction result
+(rf_conf <- confusionMatrix(valid$classe, rf_predict))
+```
+
+### Accuracy of Random Forest Model
+```{r}
+#  RF accuracy
+(rf_accuracy <- rf_conf$overall[1])
+plot(rf_conf$table, col = rf_conf$byClass, main = paste("Random Forest Confusion Matrix: Accuracy =", round(rf_conf$overall['Accuracy'], 4)))
+```
+
+##Prediction on Testing Set
+We now use random forests to predict the outcome variable classe for the testing set, since had the highest accuracy of 0.99 compared to GBM Model ( accuracy = 0.96 )and Classification Tree Model (accuracy 0.5)
+
+```{r}
+(predict(rf_fit, testData))
+```
+
